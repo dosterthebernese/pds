@@ -1,5 +1,12 @@
 # PDS
 
+see tldydx for elixir instructions  
+
+iex -S mix  
+PDS.balances("neil")  
+
+
+
 **TODO: Add description**
 
 ## Installation
