@@ -358,4 +358,99 @@ defmodule PDS do
       IO.puts("User #{user} does not exist.")
     end
   end
+
+  def upload_and_register(user) do
+    if Map.has_key?(@users, user) do
+      # hardcoded to 2 which is PDS Goog or AWS, cannot remember
+
+      {signature, vault_url, everything} = get_access_ticket(user)
+      vault_session = get_upload_session(everything, vault_url)
+      IO.puts(IO.inspect(vault_session))
+    else
+      IO.puts("User #{user} does not exist.")
+    end
+  end
+
+  defp get_access_ticket(user) do
+    # hardcoded to 2 which is PDS Goog or AWS, cannot remember
+    gurl =
+      gurler(
+        "tokens?accessType=UPLOAD&userId=#{creds(user).uid}&userPubKey=#{creds(user).pub}&vaultId=2"
+      )
+
+    IO.puts(gurl)
+
+    case HTTPoison.get(gurl) do
+      {:ok,
+       %HTTPoison.Response{
+         status_code: 200,
+         body: body
+       }} ->
+        signature = Poison.decode!(body)["signature"]
+        vault_url = Poison.decode!(body)["vaultUrl"]
+
+        dec_payload = Poison.decode!(body)
+        ree_payload = to_string(Poison.encode!(dec_payload))
+        IO.puts(ree_payload)
+        enc_ree = Base.url_encode64(ree_payload)
+        IO.puts(enc_ree)
+
+        {signature, vault_url, enc_ree}
+
+      #        {signature, vault_url, everything}
+
+      # vault_session = get_upload_session(everything, vaultUrl)
+      # IO.puts(IO.inspect(vault_session))
+
+      #          IO.puts(IO.inspect(is_binary(everything)))
+
+      # in javascript I believe this is binary, and has to be btoa into base64, but I think here, it's already base64
+
+      # IO.puts(signature)
+      # IO.puts(IO.inspect(everything["nonce"]))
+      # b64encoded_everything = Base.encode64(everything)
+      # IO.puts(IO.inspect(b64encoded_everything))
+
+      {:ok, %HTTPoison.Response{status_code: 404}} ->
+        IO.puts("Not found :(")
+
+      {:error, %HTTPoison.Error{reason: reason}} ->
+        IO.inspect(reason)
+    end
+  end
+
+  defp get_upload_session(access_ticket_encoded, vault_url) do
+    gurls = "/getsession?ticket=#{access_ticket_encoded}"
+
+    gurl =
+      URI.parse(
+        URI.merge(
+          vault_url,
+          gurls
+        )
+        |> to_string()
+      )
+
+    IO.puts(gurl)
+  end
+
+  def list_all(filepath) do
+    _list_all(filepath)
+  end
+
+  defp _list_all(filepath) do
+    cond do
+      String.contains?(filepath, ".git") -> []
+      true -> expand(File.ls(filepath), filepath)
+    end
+  end
+
+  defp expand({:ok, files}, path) do
+    files
+    |> Enum.flat_map(&_list_all("#{path}/#{&1}"))
+  end
+
+  defp expand({:error, _}, path) do
+    [path]
+  end
 end
