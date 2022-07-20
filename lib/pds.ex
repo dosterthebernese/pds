@@ -377,7 +377,8 @@ defmodule PDS do
           "vtid=#{@vault_id}#{pds_demarcation_hack}avid=#{pds_demarcation_hack}asid=#{asset_name}#{pds_demarcation_hack}"
 
         IO.inspect(asset_url)
-        register_asset(user, asset_url, Path.basename(file))
+        new_dab = register_asset(user, asset_url, Path.basename(file))
+        IO.puts(to_string(new_dab))
       end
 
       latest_publications = list_all(publish_dir)
@@ -525,21 +526,18 @@ defmodule PDS do
 
     IO.inspect(form)
 
-    dec_payload = JSON.encode!(form)
-    #    ree_payload = to_string(Poison.code!(form))
+    encform = JSON.encode!(form)
+    IO.inspect(encform)
+    sencform = to_string(encform)
+    IO.puts(sencform)
 
-    IO.inspect(dec_payload)
-
-    ree_payload = to_string(dec_payload)
-    IO.puts(ree_payload)
-
-    case HTTPoison.post(gurl, ree_payload, headers, []) do
+    case HTTPoison.post(gurl, sencform, headers, []) do
       {:ok,
        %HTTPoison.Response{
          status_code: 200,
          body: body
        }} ->
-        IO.inspect(body)
+        Poison.decode!(body)
 
       {:ok, %HTTPoison.Response{status_code: 404}} ->
         IO.puts("Not found :(")
