@@ -65,6 +65,45 @@ defmodule PDS do
     end
   end
 
+  def pump_someones_tires(sender, receiver, amt) do
+    headers = [{"Content-type", "application/json"}]
+
+    gurl = gurler("balances/transfer")
+
+    IO.puts(gurl)
+
+    form = %{
+      senderId: creds(sender).uid,
+      senderCredentials: creds(sender).priv,
+      receiverId: creds(receiver).uid,
+      senderCurrency: "SILVER",
+      receiverCurrency: "SILVER",
+      currencyAmount: amt
+    }
+
+    IO.inspect(form)
+
+    encform = JSON.encode!(form)
+    IO.inspect(encform)
+    sencform = to_string(encform)
+    IO.puts(sencform)
+
+    case HTTPoison.post(gurl, sencform, headers, []) do
+      {:ok,
+       %HTTPoison.Response{
+         status_code: 200,
+         body: body
+       }} ->
+        Poison.decode!(body)
+
+      {:ok, %HTTPoison.Response{status_code: 404}} ->
+        IO.puts("Not found :(")
+
+      {:error, %HTTPoison.Error{reason: reason}} ->
+        IO.inspect(reason)
+    end
+  end
+
   def offers(user, direction, tx_type) do
     if Map.has_key?(@users, user) do
       gurl =
