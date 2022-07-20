@@ -8,6 +8,12 @@ defmodule PDS do
       :pub =>
         "0xac34f582de44be3d2860101cad51695d6a9fa229f256a4b7c0e821d5fee24cbad0d441b77b1549bb1ce6d84570f8e8b7ad322ac47e5e76ac174bc44ec58333dc",
       :priv => "0x76eda7b636778bdf5b9176f8fd630c4a7f13c04c72ff63303600ea020ce024b0"
+    },
+    "doster" => %{
+      :uid => "0xa18607be9bbef8580383b99e104b05d9d3295f37",
+      :pub =>
+        "0x3d825f98ee82d517b9643903b45ae437319a64552991eebe8079be9db31b34f06d4eac02640891b7c440e245499b91e11cdfb8225d994e822df96cd880a3889f",
+      :priv => "0x6320099787f173526022d47e74501201e293fa5e01c27824090e9b3b6b785155"
     }
   }
   @service URI.parse("https://pdsapi.dase.io:8081/api/")
@@ -320,9 +326,12 @@ defmodule PDS do
           end
 
           if total_count > 0 do
+            assets_list = Poison.decode!(body)["assets"]
+            revised_ordering = Enum.sort_by(assets_list, fn a -> a["assetId"] end)
+
             Enum.each(
               0..(total_count - 1),
-              &pp_asset.(&1, Enum.fetch(Poison.decode!(body)["assets"], &1))
+              &pp_asset.(&1, Enum.fetch(revised_ordering, &1))
             )
           end
         else
