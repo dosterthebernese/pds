@@ -441,23 +441,13 @@ defmodule PDS do
     end
   end
 
-  defp upload_file(vault_url, session_id, file) do
+  defp upload_file(vault_url, session_id, path_to_file) do
     IO.puts(
-      "Being asked to upload " <> file <> " to " <> vault_url <> " with session id " <> session_id
+      "Being asked to upload " <>
+        path_to_file <> " to " <> vault_url <> " with session id " <> session_id
     )
 
     headers = [{"Content-type", "multipart/form-data"}]
-
-    body =
-      Poison.encode!(%{
-        # call: "MyCall",
-        # app_key: key,
-        param: [
-          %{
-            file: file
-          }
-        ]
-      })
 
     gurls = "/upload?sid=#{session_id}"
 
@@ -472,7 +462,16 @@ defmodule PDS do
 
     IO.puts(gurl)
 
-    case HTTPoison.post(gurl, body, headers, []) do
+    form =
+      {:multipart,
+       [
+         {:file, path_to_file,
+          {"form-data", [{:name, "file"}, {:filename, Path.basename(path_to_file)}]}, []}
+       ]}
+
+    IO.inspect(form)
+
+    case HTTPoison.post(gurl, form, headers, []) do
       {:ok,
        %HTTPoison.Response{
          status_code: 200,
