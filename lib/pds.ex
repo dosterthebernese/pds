@@ -13,6 +13,7 @@ defmodule PDS do
   @service URI.parse("https://pdsapi.dase.io:8081/api/")
   @offer_permutations [{:in, "buy"}, {:in, "sell"}, {:out, "buy"}, {:out, "sell"}]
   @seconds_in_a_day 86400
+  @vault_id 2
 
   defp gurler(gurls) do
     URI.parse(
@@ -366,7 +367,17 @@ defmodule PDS do
       do_upload = fn file ->
         {signature, vault_url, everything} = get_access_ticket(user)
         headers = get_upload_session(everything, vault_url)
-        upload_file(vault_url, headers["vault-session-id"], file)
+        asset_name = upload_file(vault_url, headers["vault-session-id"], file)
+        IO.inspect(asset_name)
+
+        # "vtid=1:|:avid=:|:asid=5225fb689f.ed1aef1da30d1537a848f8d1187bd3e746bd3d08bb933bc6239f02e47e6d21ba0f55faf43603b820fab6d2b2cff62b67c05103ed1026f56642284231c650dd9eda04d2281847ac0d4023313466de4f5022006a4d4ce394a86e31386d0b5b2dc8c1cfbabb9d2e63042928f8ba2f3f727e:|:mime=image/svg+xml"
+        pds_demarcation_hack = ":|:"
+
+        asset_url =
+          "vtid=#{@vault_id}#{pds_demarcation_hack}avid=#{pds_demarcation_hack}asid=#{asset_name}#{pds_demarcation_hack}"
+
+        IO.inspect(asset_url)
+        register_asset(user, asset_url, Path.basename(file))
       end
 
       latest_publications = list_all(publish_dir)
@@ -380,7 +391,7 @@ defmodule PDS do
     # hardcoded to 2 which is PDS Goog or AWS, cannot remember
     gurl =
       gurler(
-        "tokens?accessType=UPLOAD&userId=#{creds(user).uid}&userPubKey=#{creds(user).pub}&vaultId=2"
+        "tokens?accessType=UPLOAD&userId=#{creds(user).uid}&userPubKey=#{creds(user).pub}&vaultId=#{@vault_id}"
       )
 
     IO.puts(gurl)
@@ -469,13 +480,63 @@ defmodule PDS do
           {"form-data", [{:name, "file"}, {:filename, Path.basename(path_to_file)}]}, []}
        ]}
 
-    IO.inspect(form)
-
     case HTTPoison.post(gurl, form, headers, []) do
       {:ok,
        %HTTPoison.Response{
          status_code: 200,
          headers: headers,
+         body: body
+       }} ->
+        IO.inspect(body)
+        asset_id = Poison.decode!(body)["asset"]
+        IO.inspect(asset_id)
+        asset_id["name"]
+
+      {:ok, %HTTPoison.Response{status_code: 404}} ->
+        IO.puts("Not found :(")
+
+      {:error, %HTTPoison.Error{reason: reason}} ->
+        IO.inspect(reason)
+    end
+  end
+
+  defp register_asset(user, asset_url, asset_description) do
+    IO.puts(
+      "Being asked to register " <>
+        asset_description
+    )
+
+    headers = [{"Content-type", "application/json"}]
+
+    gurl = gurler("assets/create")
+
+    IO.puts(gurl)
+
+    form = %{
+      ownerId: creds(user).uid,
+      ownerCredentials: creds(user).priv,
+      dataArr: [
+        %{
+          assetUrl: asset_url,
+          description: asset_description
+        }
+      ]
+    }
+
+    IO.inspect(form)
+
+    dec_payload = JSON.encode!(form)
+    #    ree_payload = to_string(Poison.code!(form))
+
+    IO.inspect(dec_payload)
+
+    ree_payload = to_string(dec_payload)
+    IO.puts(ree_payload)
+
+    case HTTPoison.post(gurl, ree_payload, headers, []) do
+      {:ok,
+       %HTTPoison.Response{
+         status_code: 200,
          body: body
        }} ->
         IO.inspect(body)
