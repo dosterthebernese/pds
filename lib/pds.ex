@@ -359,13 +359,18 @@ defmodule PDS do
     end
   end
 
-  def upload_and_register(user) do
+  def upload_and_register(user, publish_dir) do
     if Map.has_key?(@users, user) do
       # hardcoded to 2 which is PDS Goog or AWS, cannot remember
 
-      {signature, vault_url, everything} = get_access_ticket(user)
-      vault_session = get_upload_session(everything, vault_url)
-      IO.puts(IO.inspect(vault_session))
+      do_upload = fn file ->
+        {signature, vault_url, everything} = get_access_ticket(user)
+        headers = get_upload_session(everything, vault_url)
+        upload_file(vault_url, headers["vault-session-id"], file)
+      end
+
+      latest_publications = list_all(publish_dir)
+      Enum.each(latest_publications, &do_upload.(&1))
     else
       IO.puts("User #{user} does not exist.")
     end
@@ -397,20 +402,6 @@ defmodule PDS do
 
         {signature, vault_url, enc_ree}
 
-      #        {signature, vault_url, everything}
-
-      # vault_session = get_upload_session(everything, vaultUrl)
-      # IO.puts(IO.inspect(vault_session))
-
-      #          IO.puts(IO.inspect(is_binary(everything)))
-
-      # in javascript I believe this is binary, and has to be btoa into base64, but I think here, it's already base64
-
-      # IO.puts(signature)
-      # IO.puts(IO.inspect(everything["nonce"]))
-      # b64encoded_everything = Base.encode64(everything)
-      # IO.puts(IO.inspect(b64encoded_everything))
-
       {:ok, %HTTPoison.Response{status_code: 404}} ->
         IO.puts("Not found :(")
 
@@ -432,6 +423,70 @@ defmodule PDS do
       )
 
     IO.puts(gurl)
+
+    case HTTPoison.get(gurl) do
+      {:ok,
+       %HTTPoison.Response{
+         status_code: 200,
+         headers: headers,
+         body: body
+       }} ->
+        Enum.into(headers, %{})
+
+      {:ok, %HTTPoison.Response{status_code: 404}} ->
+        IO.puts("Not found :(")
+
+      {:error, %HTTPoison.Error{reason: reason}} ->
+        IO.inspect(reason)
+    end
+  end
+
+  defp upload_file(vault_url, session_id, file) do
+    IO.puts(
+      "Being asked to upload " <> file <> " to " <> vault_url <> " with session id " <> session_id
+    )
+
+    headers = [{"Content-type", "multipart/form-data"}]
+
+    body =
+      Poison.encode!(%{
+        # call: "MyCall",
+        # app_key: key,
+        param: [
+          %{
+            file: file
+          }
+        ]
+      })
+
+    gurls = "/upload?sid=#{session_id}"
+
+    gurl =
+      URI.parse(
+        URI.merge(
+          vault_url,
+          gurls
+        )
+        |> to_string()
+      )
+
+    IO.puts(gurl)
+
+    case HTTPoison.post(gurl, body, headers, []) do
+      {:ok,
+       %HTTPoison.Response{
+         status_code: 200,
+         headers: headers,
+         body: body
+       }} ->
+        IO.inspect(body)
+
+      {:ok, %HTTPoison.Response{status_code: 404}} ->
+        IO.puts("Not found :(")
+
+      {:error, %HTTPoison.Error{reason: reason}} ->
+        IO.inspect(reason)
+    end
   end
 
   def list_all(filepath) do
