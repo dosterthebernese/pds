@@ -408,6 +408,33 @@ defmodule PDS do
     end
   end
 
+  def pre_process_thumbs(crypto, filepath \\ "../pdsr/publish") do
+    ald = fn f ->
+      IO.puts(f)
+    end
+
+    Enum.each(list_pngs(filepath), &ald.(&1))
+    Enum.each(list_crypto(list_pngs(filepath), crypto), &ald.(&1))
+
+    mycmd =
+      :io_lib.format(
+        "convert -delay 100 #{filepath}/*/#{crypto}*del.png  #{filepath}/#{crypto}-out-convert.gif",
+        []
+      )
+
+    :os.cmd(mycmd)
+  end
+
+  def list_pngs(filepath \\ "../pdsr/publish") do
+    Enum.filter(list_all(filepath), fn x -> String.contains?(String.downcase(x), "png") end)
+  end
+
+  def list_crypto(input_list, crypto) do
+    Enum.filter(input_list, fn x ->
+      String.contains?(String.downcase(x), String.downcase(crypto))
+    end)
+  end
+
   def upload_and_register(user, publish_dir) do
     if Map.has_key?(@users, user) do
       # hardcoded to 2 which is PDS Goog or AWS, cannot remember
