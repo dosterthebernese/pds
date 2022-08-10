@@ -418,7 +418,24 @@ defmodule PDS do
 
     mycmd =
       :io_lib.format(
-        "convert -delay 100 #{filepath}/*/#{crypto}*del.png  #{filepath}/#{crypto}-out-convert.gif",
+        "convert -delay 100 #{filepath}/*/#{crypto}*del.png  #{filepath}/#{crypto}.gif",
+        []
+      )
+
+    :os.cmd(mycmd)
+  end
+
+  def pre_process_zips(crypto, filepath \\ "../pdsr/publish") do
+    ald = fn f ->
+      IO.puts(f)
+    end
+
+    Enum.each(list_pngs(filepath), &ald.(&1))
+    Enum.each(list_crypto(list_pngs(filepath), crypto), &ald.(&1))
+
+    mycmd =
+      :io_lib.format(
+        "find #{filepath}/*/ -name \"#{crypto}*del.png\"  | tar -czvf #{filepath}/#{crypto}.tar.gz -T -",
         []
       )
 
@@ -461,6 +478,65 @@ defmodule PDS do
     else
       IO.puts("User #{user} does not exist.")
     end
+  end
+
+  def upload_and_register_tar_with_gif(user, publish_dir) do
+    if Map.has_key?(@users, user) do
+      # hardcoded to 2 which is PDS Goog or AWS, cannot remember
+
+      do_upload = fn file ->
+        IO.puts(file)
+
+        {signature, vault_url, everything} = get_access_ticket(user)
+        headers = get_upload_session(everything, vault_url)
+        asset_name = upload_file(vault_url, headers["vault-session-id"], file)
+        IO.inspect(asset_name)
+
+        # "vtid=1:|:avid=:|:asid=5225fb689f.ed1aef1da30d1537a848f8d1187bd3e746bd3d08bb933bc6239f02e47e6d21ba0f55faf43603b820fab6d2b2cff62b67c05103ed1026f56642284231c650dd9eda04d2281847ac0d4023313466de4f5022006a4d4ce394a86e31386d0b5b2dc8c1cfbabb9d2e63042928f8ba2f3f727e:|:mime=image/svg+xml"
+        pds_demarcation_hack = ":|:"
+
+        asset_url =
+          "vtid=#{@vault_id}#{pds_demarcation_hack}avid=#{pds_demarcation_hack}asid=#{asset_name}#{pds_demarcation_hack}mime=application/gzip"
+
+        IO.inspect(asset_url)
+        new_dab = register_asset(user, asset_url, Path.basename(file))
+        IO.puts(to_string(new_dab))
+        postdabop(new_dab, file)
+      end
+
+      latest_publications =
+        Enum.filter(list_all(publish_dir), fn x -> String.contains?(String.downcase(x), "tar") end)
+
+      Enum.each(latest_publications, &do_upload.(&1))
+    else
+      IO.puts("User #{user} does not exist.")
+    end
+  end
+
+  def postdabop(dab_id, origin) do
+    IO.puts(dab_id)
+    IO.puts(origin)
+
+    target_gif = "#{Path.dirname(origin)}/#{Path.basename(origin, ".tar.gz")}.gif"
+    target_gif_rev = "#{Path.dirname(origin)}/#{dab_id}.gif"
+    IO.puts(target_gif)
+    IO.puts(target_gif_rev)
+
+    mycmd =
+      :io_lib.format(
+        "mv #{target_gif} #{target_gif_rev}",
+        []
+      )
+
+    :os.cmd(mycmd)
+
+    mycmdaws =
+      :io_lib.format(
+        "aws s3 cp #{target_gif_rev} s3://thumbnailstlslurper/PDSAssets/",
+        []
+      )
+
+    :os.cmd(mycmdaws)
   end
 
   defp get_access_ticket(user) do
