@@ -9,6 +9,12 @@ defmodule PDS do
         "0xac34f582de44be3d2860101cad51695d6a9fa229f256a4b7c0e821d5fee24cbad0d441b77b1549bb1ce6d84570f8e8b7ad322ac47e5e76ac174bc44ec58333dc",
       :priv => "0x76eda7b636778bdf5b9176f8fd630c4a7f13c04c72ff63303600ea020ce024b0"
     },
+    "neilimages" => %{
+      :uid => "0xafdb8edeaf1082760f8e805e45d758db6daa8e9c",
+      :pub =>
+        "0x620e2311601e24f979208e5249362d24e3e68125d29931d559fac476e0b421a239816beebe28a6854b47ce1ba44a7cac97e159b8c80b5ece207c6b32e355f689",
+      :priv => "0xbf902c89e5f7d053f4202d11e95e903019d51d7f83c48dbb893d9504bebfa4c0"
+    },
     "doster" => %{
       :uid => "0xa18607be9bbef8580383b99e104b05d9d3295f37",
       :pub =>
