@@ -150,6 +150,7 @@ defmodule PDS do
             IO.puts("    Seller: " <> o["sellerId"])
             IO.puts("Term Sheet: " <> o["termSheetTemplate"])
             IO.puts("   License: " <> o["licenseType"])
+            IO.puts("     Price: " <> o["sellerMinPrice"])
             {:ok, dt, 0} = DateTime.from_iso8601(o["createdAt"])
             IO.puts("   Created: " <> DateTime.to_string(dt))
 
@@ -193,6 +194,49 @@ defmodule PDS do
 
     for {:out, tx_type} <- @offer_permutations do
       offers(user, to_string(:out), tx_type)
+    end
+  end
+
+  def bid_in_response_to_incoming_ask(user, asset_id, license_type, max_leos_price) do
+    if Map.has_key?(@users, user) do
+      headers = [{"Content-type", "application/json"}]
+
+      gurl = gurler("offers/create")
+
+      IO.puts(gurl)
+
+      form = %{
+        tradeType: "BUY",
+        licenseType: license_type,
+        buyerId: creds(user).uid,
+        buyerCredentials: creds(user).priv,
+        maxLeosPrice: max_leos_price,
+        assetId: asset_id
+      }
+
+      IO.inspect(form)
+
+      encform = JSON.encode!(form)
+      IO.inspect(encform)
+      sencform = to_string(encform)
+      IO.puts(sencform)
+
+      case HTTPoison.post(gurl, sencform, headers, []) do
+        {:ok,
+         %HTTPoison.Response{
+           status_code: 200,
+           body: body
+         }} ->
+          IO.inspect(body)
+
+        {:ok, %HTTPoison.Response{status_code: 404}} ->
+          IO.puts("Not found :(")
+
+        {:error, %HTTPoison.Error{reason: reason}} ->
+          IO.inspect(reason)
+      end
+    else
+      IO.puts("User #{user} does not exist.")
     end
   end
 
